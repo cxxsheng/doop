@@ -29,6 +29,16 @@ import static org.apache.commons.io.FilenameUtils.getBaseName
 @Log4j
 class SouffleAnalysis extends DoopAnalysis {
 
+	// Analyses that do NOT instantiate the `mainAnalysis` Souffle component: they
+	// include neither main/single-phase-analysis.dl nor main/two-phase-analysis.dl,
+	// providing their own self-contained points-to instead. The central mocking
+	// layer #includes mocking-core.dl, which references mainAnalysis.*, so it must
+	// NOT be appended for these -- doing so fails Souffle compilation with an
+	// unknown-relation error on mainAnalysis.* (e.g. the 'micro' analysis).
+	private static final Set<String> ANALYSES_WITHOUT_MAIN =
+		['basic-only', 'data-flow', 'dependency-analysis', 'micro',
+		 'sound-may-point-to', 'xtractor'] as Set
+
 	@Override
 	void run() {
 		File analysis = new File(outDir, "${name}.dl")
@@ -155,14 +165,18 @@ class SouffleAnalysis extends DoopAnalysis {
 		cpp.includeAtEnd("$analysis", "${Doop.souffleLogicPath}/basic/basic.dl")
 		cpp.includeAtEnd("$analysis", "${Doop.souffleAnalysesPath}/${getBaseName(analysis.name)}/analysis.dl")
 
-		// Central open-world mock-object layer, included for ALL analyses (not just
-		// open programs): it mocks receivers/arguments/fields/arrays for every
+		// Central open-world mock-object layer, included for every analysis that
+		// instantiates the mainAnalysis component (i.e. NOT the self-contained ones in
+		// ANALYSES_WITHOUT_MAIN -- the layer references mainAnalysis.* and would fail to
+		// compile for them): it mocks receivers/arguments/fields/arrays for every
 		// EntryPointMethod -- the main method's args, JUnit/keep roots, and any
 		// open-programs entry points. Representative policy is the default.
-		if (options.SOUND_MOCKING.value)
-			cpp.includeAtEnd("$analysis", "${Doop.souffleLogicPath}/main/mocking/mocking-all-concrete-subtypes.dl")
-		else
-			cpp.includeAtEnd("$analysis", "${Doop.souffleLogicPath}/main/mocking/mocking-representative-subtypes.dl")
+		if (!(getBaseName(analysis.name) in ANALYSES_WITHOUT_MAIN)) {
+			if (options.SOUND_MOCKING.value)
+				cpp.includeAtEnd("$analysis", "${Doop.souffleLogicPath}/main/mocking/mocking-all-concrete-subtypes.dl")
+			else
+				cpp.includeAtEnd("$analysis", "${Doop.souffleLogicPath}/main/mocking/mocking-representative-subtypes.dl")
+		}
 
 		if (options.INFORMATION_FLOW.value) {
 			String infoflowDir = "${Doop.souffleLogicPath}/addons/information-flow"
