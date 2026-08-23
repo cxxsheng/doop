@@ -6,6 +6,7 @@ import org.apache.commons.io.FilenameUtils
 import org.clyze.analysis.AnalysisPostProcessor
 import org.clyze.doop.core.Doop
 import org.clyze.doop.core.DoopAnalysis
+import org.clyze.doop.common.Database
 import org.clyze.utils.OS
 
 import java.nio.file.Files
@@ -16,7 +17,7 @@ class CommandLineAnalysisPostProcessor implements AnalysisPostProcessor<DoopAnal
 
 	@Override
 	void process(DoopAnalysis analysis) {
-		if (!analysis.options.get('FACTS_ONLY').value)
+		if (!analysis.options.get('FACTS_ONLY').value && !Database.isDatabaseOnly())
 			printStats(analysis)
 		if (analysis.options.get('SANITY').value && !analysis.options.get('DRY_RUN').value)
 			printSanityResults(analysis)

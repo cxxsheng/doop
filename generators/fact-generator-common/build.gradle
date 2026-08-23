@@ -30,6 +30,13 @@ dependencies {
     implementation "net.dongliu:apk-parser:2.6.10"                          // needed for reading binary XML entries from APK inputs
     implementation "org.antlr:antlr4-runtime:${antlrVersion}"
     implementation "org.apache.commons:commons-collections4:4.5.0"    
+    // Callers may provide a JDBC driver from an offline dependency cache.
+    // Keep a Maven fallback so the ordinary Doop build remains unchanged.
+    def doopSqliteJdbc = project.findProperty('doop.sqliteJdbc')
+    if (doopSqliteJdbc)
+        implementation files(doopSqliteJdbc)
+    else
+        implementation "org.xerial:sqlite-jdbc:3.28.0"
 }
 
 compileJava {

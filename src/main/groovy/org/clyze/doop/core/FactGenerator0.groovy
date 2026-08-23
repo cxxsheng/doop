@@ -48,8 +48,34 @@ class FactGenerator0 {
 
     private File factsFile(String s) { new File(factsDir, s + ".facts") }
 
+    private Database openSQLiteDatabase() {
+        try {
+            return new Database(factsDir.canonicalPath)
+        } catch (IOException ex) {
+            throw new RuntimeException("Could not open SQLite facts database: ${ex.message}", ex)
+        }
+    }
+
+    private void closeSQLiteDatabase(Database db) {
+        try {
+            db.flush()
+            db.close()
+        } catch (IOException ex) {
+            throw new RuntimeException("Could not close SQLite facts database: ${ex.message}", ex)
+        }
+    }
+
     void writeMainClassFacts(def mainClass) {
         if (mainClass) {
+            if (Database.isSQLiteFactsEnabled()) {
+                Database db = openSQLiteDatabase()
+                try {
+                    mainClass.each { db.add(MAIN_CLASS.name, it as String) }
+                } finally {
+                    closeSQLiteDatabase(db)
+                }
+                return
+            }
             factsFile(MAIN_CLASS.name).withWriterAppend { w ->
                 mainClass.each { w.writeLine(it as String) }
             }
@@ -57,18 +83,52 @@ class FactGenerator0 {
     }
 
     void writeDacapoFacts(String benchmark, String benchmarkCap) {
+        if (Database.isSQLiteFactsEnabled()) {
+            Database db = openSQLiteDatabase()
+            try {
+                db.add(DACAPO.name, "dacapo.${benchmark}.${benchmarkCap}Harness", "<dacapo.parser.Config: void setClass(java.lang.String)>")
+            } finally {
+                closeSQLiteDatabase(db)
+            }
+            return
+        }
         factsFile(DACAPO.name).withWriter { w ->
             w << "dacapo.${benchmark}.${benchmarkCap}Harness" + "\t" + "<dacapo.parser.Config: void setClass(java.lang.String)>"
         }
     }
 
     void writeDacapoBachFacts(String benchmarkCap) {
+        if (Database.isSQLiteFactsEnabled()) {
+            Database db = openSQLiteDatabase()
+            try {
+                db.add(DACAPO.name, "org.dacapo.harness.${benchmarkCap}", "<org.dacapo.parser.Config: void setClass(java.lang.String)>")
+            } finally {
+                closeSQLiteDatabase(db)
+            }
+            return
+        }
         factsFile(DACAPO.name).withWriter { w ->
             w << "org.dacapo.harness.${benchmarkCap}" + "\t" + "<org.dacapo.parser.Config: void setClass(java.lang.String)>"
         }
     }
 
     void writeTamiflexFacts(File origTamFile) {
+        if (Database.isSQLiteFactsEnabled()) {
+            Database db = openSQLiteDatabase()
+            try {
+                origTamFile.eachLine { line ->
+                    String normalized = line
+                            .replaceFirst(/;[^;]*;$/, "")
+                            .replaceFirst(/;$/, ";0")
+                            .replaceFirst(/(^.*;.*)\.([^.]+;[0-9]+$)/) { full, first, second -> first + ";" + second }
+                    String[] fields = normalized.replaceAll(";", "\t").replaceFirst(/\./, "\t").split("\t", -1)
+                    db.add(TAMIFLEX.name, fields)
+                }
+            } finally {
+                closeSQLiteDatabase(db)
+            }
+            return
+        }
         factsFile(TAMIFLEX.name).withWriter { w ->
             origTamFile.eachLine { line ->
                 w << line
@@ -124,6 +184,15 @@ class FactGenerator0 {
                 String typeId = parts[i+1].trim()
                 long parentId = Long.parseLong(parts[i+2])
                 log.info "Adding sensitive layout control: ${control}"
+                if (Database.isSQLiteFactsEnabled()) {
+                    Database db = openSQLiteDatabase()
+                    try {
+                        db.add(PredicateFile.SENSITIVE_LAYOUT_CONTROL.toString(), controlId.toString(), typeId, parentId.toString())
+                    } finally {
+                        closeSQLiteDatabase(db)
+                    }
+                    continue
+                }
                 factsFile(PredicateFile.SENSITIVE_LAYOUT_CONTROL.toString()).withWriterAppend { w ->
                     w << controlId + "\t" + typeId + "\t" + parentId + "\n"
                 }
@@ -185,12 +254,15 @@ class FactGenerator0 {
         String elementId = fields[3]
         switch (fields[0]) {
             case "ROOT":
+                if (Database.isSQLiteFactsEnabled()) { db.add(ROOT.name, elementId); break }
                 factsFile(ROOT.name).withWriterAppend { it << (elementId + "\n") }
                 break
             case "KEEP":
+                if (Database.isSQLiteFactsEnabled()) { db.add(KEEP_METHOD.name, elementId); break }
                 factsFile(KEEP_METHOD.name).withWriterAppend { it << (elementId + "\n") }
                 break
             case "TAINT":
+                if (Database.isSQLiteFactsEnabled()) { db.add(TAINTSPEC.name, fields[1], fields[2], elementId); break }
                 factsFile(TAINTSPEC.name).withWriterAppend { it << (fields[1] + "\t" + fields[2] + "\t" + elementId + "\n") }
                 break
             case "REMOVE":
@@ -198,12 +270,15 @@ class FactGenerator0 {
                 log.warn "WARNING: Ignoring line, not useful for analysis: $line"
                 break
             case "KEEP_CLASS":
+                if (Database.isSQLiteFactsEnabled()) { db.add(KEEP_CLASS.name, elementId); break }
                 factsFile(KEEP_CLASS.name).withWriterAppend { it << (elementId + "\n") }
                 break
             case "KEEP_CLASS_MEMBERS":
+                if (Database.isSQLiteFactsEnabled()) { db.add(KEEP_CLASS_MEMBERS.name, elementId); break }
                 factsFile(KEEP_CLASS_MEMBERS.name).withWriterAppend { it << (elementId + "\n") }
                 break
             case "KEEP_CLASSES_WITH_MEMBERS":
+                if (Database.isSQLiteFactsEnabled()) { db.add(KEEP_CLASSES_WITH_MEMBERS.name, elementId); break }
                 factsFile(KEEP_CLASSES_WITH_MEMBERS.name).withWriterAppend { it << (elementId + "\n") }
                 break
             default:
@@ -215,6 +290,11 @@ class FactGenerator0 {
      * Initialize all output fact files.
      */
     void touch() {
+        // In database-only mode the fact generator writes directly through
+        // Database. Creating empty compatibility files here would violate the
+        // no-.facts contract and confuse SQLite-backed Souffle inputs.
+        if (Database.isSQLiteFactsEnabled())
+            return
         values().each {
             FileUtils.touch(factsFile(it.name))
         }

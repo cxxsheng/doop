@@ -9,6 +9,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import org.clyze.doop.common.DoopErrorCodeException
+import org.clyze.doop.common.Database
 import org.clyze.doop.jimple.JimpleProcessor
 import org.clyze.doop.soot.DoopConventions
 import org.clyze.doop.utils.ConfigurationGenerator
@@ -48,10 +49,14 @@ class SouffleAnalysis extends DoopAnalysis {
 		initDatabase(analysis)
 		runAnalysisAndProduceStats(analysis)
 
-		File runtimeMetricsFile = File.createTempFile('Stats_Runtime', '.csv')
-		log.debug "Using intermediate runtime metrics file: ${runtimeMetricsFile.canonicalPath}"
-		runtimeMetricsFile.deleteOnExit()
-		runtimeMetricsFile.createNewFile()
+		boolean databaseOnly = Database.isDatabaseOnly()
+		File runtimeMetricsFile = null
+		if (!databaseOnly) {
+			runtimeMetricsFile = File.createTempFile('Stats_Runtime', '.csv')
+			log.debug "Using intermediate runtime metrics file: ${runtimeMetricsFile.canonicalPath}"
+			runtimeMetricsFile.deleteOnExit()
+			runtimeMetricsFile.createNewFile()
+		}
 
 		SouffleScript script = newScriptForAnalysis(executor)
 
@@ -94,7 +99,8 @@ class SouffleAnalysis extends DoopAnalysis {
 			generateFacts()
 			script.postprocessFacts(outDir, souffleOpts.profile)
 			log.info "[Task FACTS Done]"
-			runtimeMetricsFile.append("fact generation time (sec)\t${factGenTime}\n")
+			if (runtimeMetricsFile)
+				runtimeMetricsFile.append("fact generation time (sec)\t${factGenTime}\n")
 
 			if (options.X_SERVER_CHA.value) {
 				log.info "[CHA...]"
@@ -115,7 +121,8 @@ class SouffleAnalysis extends DoopAnalysis {
 				if (!options.X_SERIALIZE_FACTGEN_COMPILATION.value) {
 					generatedFile = compilationFuture.get()
 				}
-				runtimeMetricsFile.append("analysis compilation time (sec)\t${script.compilationTime}\n")
+				if (runtimeMetricsFile)
+					runtimeMetricsFile.append("analysis compilation time (sec)\t${script.compilationTime}\n")
 			}
 
 			if (!options.DRY_RUN.value) {
@@ -127,15 +134,18 @@ class SouffleAnalysis extends DoopAnalysis {
 						       monitorInterval, monitorClosure, souffleOpts)
 				}
 
-				runtimeMetricsFile.append("analysis execution time (sec)\t${script.executionTime}\n")
-				int dbSize = (sizeOfDirectory(database) / 1024).intValue()
-				runtimeMetricsFile.append("disk footprint (KB)\t${dbSize}\n")
+				if (runtimeMetricsFile) {
+					runtimeMetricsFile.append("analysis execution time (sec)\t${script.executionTime}\n")
+					int dbSize = (sizeOfDirectory(database) / 1024).intValue()
+					runtimeMetricsFile.append("disk footprint (KB)\t${dbSize}\n")
+				}
 				postprocess()
 
 				if (this.name == "xtractor") XTractor.run(this)
 			}
 
-			Files.move(runtimeMetricsFile.toPath(), new File(database, "Stats_Runtime.csv").toPath(), StandardCopyOption.REPLACE_EXISTING)
+			if (runtimeMetricsFile)
+				Files.move(runtimeMetricsFile.toPath(), new File(database, "Stats_Runtime.csv").toPath(), StandardCopyOption.REPLACE_EXISTING)
 		} finally {
 			executorService.shutdownNow()
 		}

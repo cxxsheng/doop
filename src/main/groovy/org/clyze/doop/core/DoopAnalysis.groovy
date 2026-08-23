@@ -7,6 +7,7 @@ import org.apache.log4j.Logger
 import org.clyze.analysis.Analysis
 import org.clyze.analysis.AnalysisOption
 import org.clyze.doop.common.CHA
+import org.clyze.doop.common.Database
 import org.clyze.doop.common.DoopErrorCodeException
 import org.clyze.doop.util.ClassPathHelper
 import org.clyze.doop.util.Resource
@@ -131,6 +132,29 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
      * @param fromDir the existing directory containing the facts
      */
     protected void linkOrCopyFacts(File fromDir) {
+        if (Database.isSQLiteFactsEnabled()) {
+            File source = Database.sqliteFactsFile(fromDir.canonicalPath)
+            File target = Database.sqliteFactsFile(factsDir.canonicalPath)
+            if (!source.isFile())
+                throw new RuntimeException("SQLite facts database does not exist: ${source}")
+            if (source.canonicalFile == target.canonicalFile)
+                return
+
+            deleteQuietly(factsDir)
+            factsDir.mkdirs()
+            if (options.X_SYMLINK_INPUT_FACTS.value) {
+                try {
+                    Files.createSymbolicLink(target.toPath(), source.toPath())
+                    return
+                } catch (UnsupportedOperationException ignored) {
+                    log.warn("WARNING: Filesystem does not support symbolic links, copying SQLite facts instead...")
+                }
+            }
+            log.debug "Copying SQLite facts: ${source} -> ${target}"
+            copyFile(source, target)
+            return
+        }
+
         if (options.X_SYMLINK_INPUT_FACTS.value) {
             try {
                 fromDir.eachFile { file ->
@@ -186,10 +210,14 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
                 File extraFacts = new File(extraFactsPath)
                 if (extraFacts.exists()) {
                     log.info "Augmenting ${extraFacts.name} with file: ${extraFactsPath}"
-                    File target = new File(database, extraFacts.name)
-                    extraFacts.withReader("UTF-8") { extraIn ->
-                        target.withWriterAppend("UTF-8") { targetOut ->
-                            targetOut << extraIn
+                    if (Database.isSQLiteFactsEnabled())
+                        importTabFacts(extraFacts, FilenameUtils.removeExtension(extraFacts.name))
+                    else {
+                        File target = new File(database, extraFacts.name)
+                        extraFacts.withReader("UTF-8") { extraIn ->
+                            target.withWriterAppend("UTF-8") { targetOut ->
+                                targetOut << extraIn
+                            }
                         }
                     }
                 } else
@@ -199,13 +227,44 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
         }
     }
 
+    /** Import a legacy tab-separated option file directly into the SQLite facts DB. */
+    private void importTabFacts(File source, String relation) {
+        try {
+            org.clyze.doop.common.Database db = new org.clyze.doop.common.Database(database.canonicalPath)
+            try {
+                source.eachLine("UTF-8") { String line ->
+                    if (!line.empty)
+                        db.add(relation, line.split('\t', -1))
+                }
+            } finally {
+                db.flush()
+                db.close()
+            }
+        } catch (IOException ex) {
+            throw new RuntimeException("Could not import ${source} into SQLite relation ${relation}: ${ex.message}", ex)
+        }
+    }
+
     /**
      * Initializes the facts directory. This method may be called repeatedly,
      * when restarting fact generation.
      */
     protected void initFactsDir() {
-        deleteQuietly(factsDir)
-        factsDir.mkdirs()
+        if (Database.isSQLiteFactsEnabled()) {
+            // Keep the SQLite file itself so callers can pre-create the full
+            // Souffle input schema. Reset its rows instead of recursively
+            // deleting the facts directory.
+            factsDir.mkdirs()
+            File sqliteFacts = Database.sqliteFactsFile(factsDir.canonicalPath)
+            factsDir.eachFile { File file ->
+                if (file.canonicalFile != sqliteFacts.canonicalFile)
+                    deleteQuietly(file)
+            }
+            Database.resetSQLiteFacts(factsDir.canonicalPath)
+        } else {
+            deleteQuietly(factsDir)
+            factsDir.mkdirs()
+        }
         generateFacts0()
     }
 
@@ -270,7 +329,7 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
                 JHelper.cleanUp(tmpDirs)
             }
 
-            if (options.UNIQUE_FACTS.value) {
+            if (options.UNIQUE_FACTS.value && !Database.isSQLiteFactsEnabled()) {
                 def timing = Helper.timing {
                     factsDir.eachFileMatch(~/.*.facts/) { file ->
                         def uniqueLines = file.readLines() as SortedSet<String>
@@ -294,7 +353,12 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
                     log.info "Caching facts in $cacheDir"
                     deleteQuietly(cacheDir)
                     cacheDir.mkdirs()
-                    FileOps.copyDirContentsWithRetry(factsDir, cacheDir)
+                    if (Database.isSQLiteFactsEnabled()) {
+                        File source = Database.sqliteFactsFile(factsDir.canonicalPath)
+                        File target = Database.sqliteFactsFile(cacheDir.canonicalPath)
+                        copyFile(source, target)
+                    } else
+                        FileOps.copyDirContentsWithRetry(factsDir, cacheDir)
                     new File(cacheDir, "meta").withWriter { BufferedWriter w -> w.write(cacheMeta()) }
                 }
             } else {
@@ -305,20 +369,32 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
 
         if (options.SPECIAL_CONTEXT_SENSITIVITY_METHODS.value) {
             File origSpecialCSMethodsFile = new File(options.SPECIAL_CONTEXT_SENSITIVITY_METHODS.value.toString())
-            File destSpecialCSMethodsFile = new File(factsDir, "SpecialContextSensitivityMethod.facts")
-            Files.copy(origSpecialCSMethodsFile.toPath(), destSpecialCSMethodsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            if (Database.isSQLiteFactsEnabled())
+                importTabFacts(origSpecialCSMethodsFile, "SpecialContextSensitivityMethod")
+            else {
+                File destSpecialCSMethodsFile = new File(factsDir, "SpecialContextSensitivityMethod.facts")
+                Files.copy(origSpecialCSMethodsFile.toPath(), destSpecialCSMethodsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
         }
 
         if (options.X_ZIPPER.value) {
             File origZipperFile = new File(options.X_ZIPPER.value.toString())
-            File destZipperFile = new File(factsDir, "ZipperPrecisionCriticalMethod.facts")
-            Files.copy(origZipperFile.toPath(), destZipperFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            if (Database.isSQLiteFactsEnabled())
+                importTabFacts(origZipperFile, "ZipperPrecisionCriticalMethod")
+            else {
+                File destZipperFile = new File(factsDir, "ZipperPrecisionCriticalMethod.facts")
+                Files.copy(origZipperFile.toPath(), destZipperFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
         }
 
         if (options.USER_DEFINED_PARTITIONS.value) {
             File origPartitionsFile = new File(options.USER_DEFINED_PARTITIONS.value.toString())
-            File destPartitionsFile = new File(factsDir, "TypeToPartition.facts")
-            Files.copy(origPartitionsFile.toPath(), destPartitionsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            if (Database.isSQLiteFactsEnabled())
+                importTabFacts(origPartitionsFile, "TypeToPartition")
+            else {
+                File destPartitionsFile = new File(factsDir, "TypeToPartition.facts")
+                Files.copy(origPartitionsFile.toPath(), destPartitionsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
         }
 
     }
