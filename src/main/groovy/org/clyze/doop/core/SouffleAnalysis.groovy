@@ -166,6 +166,12 @@ class SouffleAnalysis extends DoopAnalysis {
 		// Check the open programs argument before calling the preprocessor.
 		String openProgramsProfile = null
 		String openProgramsRules = options.OPEN_PROGRAMS.value
+		// The command-line sentinel disables open-program rules; it is not a
+		// filename. Normalize it here even when a manifest supplied a main
+		// class, so --open-programs disabled behaves consistently for every
+		// input archive.
+		if (openProgramsRules == DoopAnalysisFamily.FORCE_OPEN_PROGRAMS_DISABLED)
+			openProgramsRules = null
 		if (openProgramsRules) {
 			openProgramsProfile = "${Doop.souffleLogicPath}/addons/open-programs/rules-${openProgramsRules}.dl"
 			if (!(new File(openProgramsProfile)).exists())
