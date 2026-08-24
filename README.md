@@ -246,11 +246,24 @@ Example:
 #### Packages (--regex)
 
 The Java packages to treat as application code (not library code) and analyze exhaustively.
+For class-JAR inputs, this also limits the initial set of classes Soot eagerly
+loads from the input archives.  The complete archive remains on the class path,
+so referenced types are resolved on demand rather than being discarded.
 
 Example:
 
 ```bash
 ./doop --regex com.example.package1.*:com.example.package2.*
+```
+
+Patterns are separated by the platform path separator.  A pattern prefixed
+with `!` subtracts matching classes after the positive union; when no positive
+pattern is supplied, the exclusion is applied to the complete class universe.
+For example, to analyze a package while omitting generated implementation
+classes:
+
+```bash
+./doop --regex 'com.example.service.**:!com.example.service.generated.**'
 ```
 
 #### Properties file (-p, --properties)

@@ -2,6 +2,7 @@ package org.clyze.doop.soot;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.TreeSet;
 import org.clyze.doop.common.ArtifactScanner;
 import org.clyze.doop.common.BasicJavaSupport;
 import soot.Scene;
@@ -9,9 +10,11 @@ import soot.SootClass;
 import soot.SourceLocator;
 
 public class BasicJavaSupport_Soot extends BasicJavaSupport implements ClassAdder {
+    private final SootParameters parameters;
 
     public BasicJavaSupport_Soot(SootParameters parameters, ArtifactScanner artScanner) {
         super(parameters, artScanner);
+        this.parameters = parameters;
     }
 
     public void addSootClasses(Iterable<String> classesToLoad, Collection<SootClass> loadedClasses, Scene scene) {
@@ -47,9 +50,29 @@ public class BasicJavaSupport_Soot extends BasicJavaSupport implements ClassAdde
 
     @Override
     public void addAppClasses(Set<SootClass> classes, Scene scene) {
-        addSootClasses(classesInApplicationJars, classes, scene);
+        Set<String> initialClasses = selectInitialApplicationClasses(
+                classesInApplicationJars, parameters);
+        addSootClasses(initialClasses, classes, scene);
         addBasicClasses(scene);
-        System.out.println("Classes in input (application) jar(s): " + classesInApplicationJars.size());
+        System.out.println("Classes selected from input (application) jar(s): "
+                + initialClasses.size() + " (of " + classesInApplicationJars.size() + ")");
+    }
+
+    /**
+     * Select the initial application classes to load from input archives.
+     *
+     * Input archives remain on Soot's class path, so types referenced by these
+     * classes can still be resolved on demand.  The application regex therefore
+     * controls eager loading without turning the archive into a physically
+     * sliced artifact.
+     */
+    static Set<String> selectInitialApplicationClasses(Collection<String> inputClasses,
+                                                        SootParameters parameters) {
+        Set<String> selected = new TreeSet<>();
+        for (String className : inputClasses)
+            if (parameters.isApplicationClass(className))
+                selected.add(className);
+        return selected;
     }
 
     @Override

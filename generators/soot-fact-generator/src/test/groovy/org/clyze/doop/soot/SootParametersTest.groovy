@@ -3,6 +3,61 @@ package org.clyze.doop.soot
 import spock.lang.Specification
 
 class SootParametersTest extends Specification {
+    def "Application regex limits initially loaded input classes"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "--application-regex", "com.android.server.power.**",
+            "-i", "services.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        when:
+        Set<String> selected = BasicJavaSupport_Soot.selectInitialApplicationClasses([
+            "com.android.server.power.PowerManagerService",
+            "com.android.server.power.PowerManagerService\$BinderService",
+            "com.android.server.power.batterysaver.BatterySaverController",
+            "com.android.server.am.ActivityManagerService"
+        ], parameters)
+
+        then:
+        selected == [
+            "com.android.server.power.PowerManagerService",
+            "com.android.server.power.PowerManagerService\$BinderService",
+            "com.android.server.power.batterysaver.BatterySaverController"
+        ] as Set
+    }
+
+    def "Default application regex keeps all input classes"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "-i", "services.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        expect:
+        BasicJavaSupport_Soot.selectInitialApplicationClasses(
+            ["a.A", "b.B"], parameters) == ["a.A", "b.B"] as Set
+    }
+
+    def "Application regex exclusions suppress eager loading"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "--application-regex", "com.example.**" + File.pathSeparator + "!com.example.generated.**",
+            "-i", "application.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        expect:
+        BasicJavaSupport_Soot.selectInitialApplicationClasses([
+            "com.example.Service",
+            "com.example.generated.Proxy",
+            "com.other.Type"
+        ], parameters) == ["com.example.Service"] as Set
+    }
+
     def "SootParameters parsing"() {
         given:
         String[] args = [
