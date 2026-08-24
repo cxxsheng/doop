@@ -39,7 +39,21 @@ class SootParametersTest extends Specification {
             "-d", "out-dir"
         ] as String[])
 
-        expect:
+        when:
+        Set<String> selected = BasicJavaSupport_Soot.selectInitialApplicationClasses([
+            "com.example.model.Model",
+            "com.example.runtime.Root",
+            "com.other.Type"
+        ], parameters)
+
+        then:
+        // Eager loading follows --load-regex, while application facts follow
+        // --application-regex.  In particular, runtime.Root must be loaded
+        // even though it is not classified as an application class.
+        selected == [
+            "com.example.model.Model",
+            "com.example.runtime.Root"
+        ] as Set
         parameters.isApplicationClass("com.example.runtime.Root") == false
         parameters.isInitiallyLoadedClass("com.example.runtime.Root") == true
     }
