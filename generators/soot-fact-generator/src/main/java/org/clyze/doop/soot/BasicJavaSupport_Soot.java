@@ -35,7 +35,7 @@ public class BasicJavaSupport_Soot extends BasicJavaSupport implements ClassAdde
 
     @Override
     public boolean isAppClass(String t) {
-        return classesInApplicationJars.contains(t);
+        return classesInApplicationJars.contains(t) && parameters.isApplicationClass(t);
     }
 
     @Override
@@ -70,7 +70,7 @@ public class BasicJavaSupport_Soot extends BasicJavaSupport implements ClassAdde
                                                         SootParameters parameters) {
         Set<String> selected = new TreeSet<>();
         for (String className : inputClasses)
-            if (parameters.isApplicationClass(className))
+            if (parameters.isInitiallyLoadedClass(className))
                 selected.add(className);
         return selected;
     }

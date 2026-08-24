@@ -31,6 +31,7 @@ public class Parameters {
     public boolean _debug = false;
     private String _logDir = null;
     private ClassFilter applicationClassFilter;
+    private ClassFilter initialClassFilter;
     public boolean _scanNativeCode = false;
     public boolean _nativeRadare = false;
     public boolean _nativeBuiltin = false;
@@ -59,6 +60,7 @@ public class Parameters {
 
     public Parameters() {
         setAppRegex("**");
+        initialClassFilter = null;
     }
 
     private void processArgs(String[] args) throws DoopErrorCodeException {
@@ -78,6 +80,10 @@ public class Parameters {
 
     private void setAppRegex(String regex) {
         applicationClassFilter = new GlobClassFilter(regex);
+    }
+
+    private void setLoadRegex(String regex) {
+        initialClassFilter = new GlobClassFilter(regex);
     }
 
     public void setInputs(List<String> inputs) {
@@ -106,6 +112,12 @@ public class Parameters {
 
     public boolean isApplicationClass(String className) {
         return applicationClassFilter.matches(className);
+    }
+
+    /** Return whether an input-archive class should be eagerly loaded. */
+    public boolean isInitiallyLoadedClass(String className) {
+        return (initialClassFilter == null ? applicationClassFilter : initialClassFilter)
+                .matches(className);
     }
 
     public List<String> getDependenciesAndPlatformLibs() {
@@ -188,6 +200,10 @@ public class Parameters {
         case "--application-regex":
             i = shift(args, i);
             setAppRegex(args[i]);
+            break;
+        case "--load-regex":
+            i = shift(args, i);
+            setLoadRegex(args[i]);
             break;
         case "--args-file":
             i = shift(args, i);

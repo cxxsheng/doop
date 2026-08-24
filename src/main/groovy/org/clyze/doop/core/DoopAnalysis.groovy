@@ -420,7 +420,9 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
             throw new RuntimeException("Internal error: no application regex available for code fact generator.")
         }
 
-        Collection<String> params = ["--application-regex", options.APP_REGEX.value.toString()]
+        Collection<String> params = ["--application-regex", options.APP_REGEX.value.toString(),
+                                     "--load-regex",
+                                     (options.LOAD_REGEX.value ?: options.APP_REGEX.value).toString()]
 
         if (Logger.rootLogger.debugEnabled) {
             params.add("--debug")

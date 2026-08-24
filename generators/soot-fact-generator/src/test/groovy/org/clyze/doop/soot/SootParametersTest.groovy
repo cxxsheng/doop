@@ -8,6 +8,7 @@ class SootParametersTest extends Specification {
         SootParameters parameters = new SootParameters()
         parameters.initFromArgs([
             "--application-regex", "com.android.server.power.**",
+            "--load-regex", "com.android.server.power.**",
             "-i", "services.jar",
             "-d", "out-dir"
         ] as String[])
@@ -26,6 +27,21 @@ class SootParametersTest extends Specification {
             "com.android.server.power.PowerManagerService\$BinderService",
             "com.android.server.power.batterysaver.BatterySaverController"
         ] as Set
+    }
+
+    def "load regex can be broader than application classification"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "--application-regex", "com.example.model.**",
+            "--load-regex", "com.example.**",
+            "-i", "services.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        expect:
+        parameters.isApplicationClass("com.example.runtime.Root") == false
+        parameters.isInitiallyLoadedClass("com.example.runtime.Root") == true
     }
 
     def "Default application regex keeps all input classes"() {

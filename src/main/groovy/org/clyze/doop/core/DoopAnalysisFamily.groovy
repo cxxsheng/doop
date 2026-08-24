@@ -434,6 +434,13 @@ class DoopAnalysisFamily implements AnalysisFamily {
 					forCacheID: true
 			),
 			new AnalysisOption<String>(
+					id: "LOAD_REGEX",
+					name: "load-regex",
+					argName: "EXPRESSION",
+					description: "Class expression controlling eager loading of input-archive classes.",
+					forCacheID: true
+			),
+			new AnalysisOption<String>(
 					id: "AUTO_APP_REGEX_MODE",
 					name: "auto-app-regex-mode",
 					argName: "MODE",
