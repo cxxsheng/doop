@@ -259,7 +259,7 @@ public class Main {
         if (android == null) {
             long time1 = System.currentTimeMillis();
             try {
-                DoopAddons.retrieveAllSceneClassesBodies(sootParameters._cores);
+                DoopAddons.retrieveAllSceneClassesBodies(classes, sootParameters._cores, sootParameters);
                 // The call below has a problem (only retrieves app method bodies).
                 // DoopAddons.retrieveAllBodies();
                 long time2 = System.currentTimeMillis();

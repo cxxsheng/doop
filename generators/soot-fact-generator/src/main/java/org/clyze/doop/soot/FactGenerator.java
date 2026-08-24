@@ -191,6 +191,14 @@ class FactGenerator implements Runnable {
         for(SootClass clazz: m.getExceptions())
             _writer.writeMethodDeclaresException(m, clazz);
 
+        // Keep declarations/signatures for every selected class, but avoid
+        // materializing or traversing method bodies outside the optional
+        // body-scope policy.  This second guard is required because a body may
+        // be requested indirectly during fact generation even when the eager
+        // retrieval pass skipped its declaring class.
+        if (!sootParameters.isBodyClass(m.getDeclaringClass()))
+            return;
+
         if(!(m.isAbstract() || m.isNative())) {
             if(!m.hasActiveBody()) {
                 // This instruction is the bottleneck of
@@ -536,4 +544,3 @@ class FactGenerator implements Runnable {
             throw new RuntimeException("Unhandled throw statement: " + stmt);
     }
 }
-

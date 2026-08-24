@@ -8,6 +8,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -65,15 +67,39 @@ public class DoopAddons {
     }
 
     public static void retrieveAllSceneClassesBodies(Integer _cores) {
+        // Keep the historical API and semantics for callers that do not have
+        // a body-scope policy: take a stable snapshot of the complete Scene.
+        List<SootClass> classes = new ArrayList<>();
+        Iterator<SootClass> clIt = Scene.v().getClasses().snapshotIterator();
+        while (clIt.hasNext())
+            classes.add(clIt.next());
+        retrieveAllSceneClassesBodies(classes, _cores, null);
+    }
+
+    /**
+     * Retrieve bodies only for the supplied classes selected by the optional
+     * body-scope policy.  The class collection is intentionally supplied by
+     * the caller: facts-subset pruning happens immediately before this step,
+     * so body materialization follows that same scope rather than the global
+     * Soot Scene.
+     */
+    public static void retrieveAllSceneClassesBodies(Collection<SootClass> classes,
+                                                     Integer _cores,
+                                                     SootParameters parameters) {
         // The old coffi front-end is not thread-safe
         boolean runSeq = (_cores == null);
         int threadNum = runSeq ? 1 : _cores;
         CountingThreadPoolExecutor executor = new CountingThreadPoolExecutor(threadNum,
                                                                              threadNum, 30, TimeUnit.SECONDS,
                                                                              new LinkedBlockingQueue<>());
-        Iterator<SootClass> clIt = Scene.v().getClasses().snapshotIterator();
-        while( clIt.hasNext() ) {
-            SootClass cl = clIt.next();
+        int selectedClasses = 0;
+        // Soot may discover phantom methods while a body is being resolved;
+        // iterate a stable class snapshot just as the legacy implementation
+        // did for Scene.v().getClasses().
+        for (SootClass cl : new ArrayList<>(classes)) {
+            if (parameters != null && !parameters.isBodyClass(cl))
+                continue;
+            selectedClasses++;
             //note: the following is a snapshot iterator;
             //this is necessary because it can happen that phantom methods
             //are added during resolution
@@ -81,6 +107,8 @@ public class DoopAddons {
                 if (m.isConcrete())
                     executor.execute(m::retrieveActiveBody);
         }
+        System.out.println("Classes selected for body retrieval: " + selectedClasses
+                           + " (of " + classes.size() + ")");
         // Wait till all method bodies have been loaded
         try {
             executor.awaitCompletion();

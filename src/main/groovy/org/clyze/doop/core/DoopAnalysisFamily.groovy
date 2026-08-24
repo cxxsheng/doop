@@ -441,6 +441,14 @@ class DoopAnalysisFamily implements AnalysisFamily {
 					forCacheID: true
 			),
 			new AnalysisOption<String>(
+					id: "BODY_REGEX",
+					name: "body-regex",
+					argName: "EXPRESSION",
+					group: GROUP_FACTS,
+					description: "Class expression selecting classes whose method bodies are materialized for fact generation.",
+					forCacheID: true
+			),
+			new AnalysisOption<String>(
 					id: "AUTO_APP_REGEX_MODE",
 					name: "auto-app-regex-mode",
 					argName: "MODE",
@@ -452,6 +460,13 @@ class DoopAnalysisFamily implements AnalysisFamily {
 					name: "app-only",
 					description: "Only analyze the application input(s), ignore libraries/platform.",
 					forPreprocessor: true
+			),
+			new BooleanAnalysisOption(
+					id: "NO_FULL",
+					name: "no-full",
+					group: GROUP_FACTS,
+					description: "Do not enable Soot's full transitive resolver; resolve only classes needed by inputs.",
+					forCacheID: true
 			),
 			new BooleanAnalysisOption(
 					id: "ANDROID",

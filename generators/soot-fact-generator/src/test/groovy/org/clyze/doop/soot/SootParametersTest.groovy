@@ -88,6 +88,37 @@ class SootParametersTest extends Specification {
         ], parameters) == ["com.example.Service"] as Set
     }
 
+    def "Body regex limits body materialization independently"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "--application-regex", "com.example.**",
+            "--body-regex", "com.example.service.**" + File.pathSeparator + "!com.example.service.generated.**",
+            "-i", "application.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        expect:
+        parameters.isBodyClass("com.example.service.Service")
+        !parameters.isBodyClass("com.example.service.generated.Proxy")
+        !parameters.isBodyClass("com.example.model.Model")
+        // The body policy must not change application classification.
+        parameters.isApplicationClass("com.example.model.Model")
+    }
+
+    def "Body regex defaults to all classes"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "-i", "application.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        expect:
+        parameters.isBodyClass("a.A")
+        parameters.isBodyClass("b.B")
+    }
+
     def "SootParameters parsing"() {
         given:
         String[] args = [

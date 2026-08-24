@@ -25,6 +25,11 @@ public class SootParameters extends Parameters {
         return isApplicationClass(Representation.unescapeSimpleName(klass.getName()));
     }
 
+    /** Return whether method bodies of this class should be materialized. */
+    public boolean isBodyClass(SootClass klass) {
+        return isBodyClass(Representation.unescapeSimpleName(klass.getName()));
+    }
+
     public Collection<String> getExtraClassesToResolve() {
         return extraClassesToResolve;
     }
@@ -96,6 +101,7 @@ public class SootParameters extends Parameters {
         System.err.println("  --also-resolve <class>                Force resolution of class that may not be found automatically.");
         System.err.println("  --facts-subset <subset>               Produce facts only for a subset of the given classes " + Arrays.asList(Parameters.FactsSubSet.values()) + ".");
         System.err.println("  --load-regex <expression>             Select input-archive classes to load initially.");
+        System.err.println("  --body-regex <expression>             Select classes whose method bodies are materialized.");
         System.err.println("  --failOnMissingClasses <file>         Terminate if classes are missing (and record them to <file>).");
         System.err.println("  --legacy-android-processing           Enable legacy Android XML processing.");
         System.err.println("  --no-facts                            Don't generate facts (just empty files -- used for debugging).");

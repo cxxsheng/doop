@@ -518,7 +518,16 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
     }
 
     protected void runSoot(String platform, Collection<String> deps, List<File> platforms, Collection<String> params) {
-        params += [ "--full" ]
+        // Preserve the historical full-resolver default.  --no-full is an
+        // explicit opt-in for analyses that want Soot to resolve only classes
+        // needed by the selected inputs.
+        if (!options.NO_FULL.value)
+            params += [ "--full" ]
+
+        // WALA/Dex front-ends do not consume this Soot-specific option, so it
+        // is appended here rather than in runFrontEnd().
+        if (options.BODY_REGEX.value)
+            params += [ "--body-regex", options.BODY_REGEX.value.toString() ]
 
         if (platform == "android") {
             // This uses all platformLibs.

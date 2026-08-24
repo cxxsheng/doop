@@ -32,6 +32,12 @@ public class Parameters {
     private String _logDir = null;
     private ClassFilter applicationClassFilter;
     private ClassFilter initialClassFilter;
+    /**
+     * Optional policy for selecting classes whose method bodies are
+     * materialized and traversed by a fact generator.  A null filter retains
+     * the historical behaviour (all resolved classes).
+     */
+    private ClassFilter bodyClassFilter;
     public boolean _scanNativeCode = false;
     public boolean _nativeRadare = false;
     public boolean _nativeBuiltin = false;
@@ -86,6 +92,10 @@ public class Parameters {
         initialClassFilter = new GlobClassFilter(regex);
     }
 
+    private void setBodyRegex(String regex) {
+        bodyClassFilter = new GlobClassFilter(regex);
+    }
+
     public void setInputs(List<String> inputs) {
         _inputs = inputs;
     }
@@ -118,6 +128,15 @@ public class Parameters {
     public boolean isInitiallyLoadedClass(String className) {
         return (initialClassFilter == null ? applicationClassFilter : initialClassFilter)
                 .matches(className);
+    }
+
+    /**
+     * Return whether a class's method bodies should be materialized for fact
+     * generation.  When --body-regex is omitted, every class is selected to
+     * preserve the historical full-body behaviour.
+     */
+    public boolean isBodyClass(String className) {
+        return bodyClassFilter == null || bodyClassFilter.matches(className);
     }
 
     public List<String> getDependenciesAndPlatformLibs() {
@@ -204,6 +223,10 @@ public class Parameters {
         case "--load-regex":
             i = shift(args, i);
             setLoadRegex(args[i]);
+            break;
+        case "--body-regex":
+            i = shift(args, i);
+            setBodyRegex(args[i]);
             break;
         case "--args-file":
             i = shift(args, i);
