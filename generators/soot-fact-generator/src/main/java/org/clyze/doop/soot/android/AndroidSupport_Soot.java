@@ -23,7 +23,10 @@ public class AndroidSupport_Soot extends AndroidSupport implements ClassAdder {
      */
     private void addClasses(Collection<SootClass> classes, Scene scene, String inputApk) {
         System.out.println("Android mode, APK = " + inputApk);
-        java.getArtifactScanner().processAPKClasses(inputApk, (className -> classes.add(scene.loadClass(className, SootClass.BODIES))));
+        java.getArtifactScanner().processAPKClasses(inputApk, (className -> {
+            if (parameters.isInitiallyLoadedClass(className))
+                classes.add(scene.loadClass(className, SootClass.BODIES));
+        }));
     }
 
     private void addClasses(Iterable<String> inputs, Collection<SootClass> classes, Scene scene, Iterable<String> target) {
@@ -35,7 +38,11 @@ public class AndroidSupport_Soot extends AndroidSupport implements ClassAdder {
                 // are not ideal for analysis in Android, as they
                 // don't contain AppResources.xml.
                 System.out.println("Android mode, input = " + input);
-                ((BasicJavaSupport_Soot)java).addSootClasses(target, classes, scene);
+                List<String> selected = new ArrayList<>();
+                for (String className : target)
+                    if (parameters.isInitiallyLoadedClass(className))
+                        selected.add(className);
+                ((BasicJavaSupport_Soot)java).addSootClasses(selected, classes, scene);
             }
         }
     }
@@ -57,7 +64,7 @@ public class AndroidSupport_Soot extends AndroidSupport implements ClassAdder {
 
     @Override
     public boolean isAppClass(String t) {
-        return java.getClassesInApplicationJars().contains(t);
+        return java.getClassesInApplicationJars().contains(t) && parameters.isApplicationClass(t);
     }
 
     @Override
