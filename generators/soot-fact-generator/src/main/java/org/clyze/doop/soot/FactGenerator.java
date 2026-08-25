@@ -47,24 +47,56 @@ class FactGenerator implements Runnable {
     @Override
     public void run() {
         for (SootClass _sootClass : _sootClasses) {
-            _writer.writeClassOrInterfaceType(_sootClass);
+            // Class metadata is best-effort.  In restricted analyses Soot may
+            // leave a library class below HIERARCHY resolution; querying its
+            // superclass/interfaces/fields can then throw.  Keep these
+            // failures local so method declarations (which only require
+            // SIGNATURES) are still emitted for this class and all following
+            // classes.
+            try {
+                _writer.writeClassOrInterfaceType(_sootClass);
 
-            for (String mod : getModifiers(_sootClass.getModifiers(), false))
-                if (!mod.trim().equals(""))
-                    _writer.writeClassModifier(_sootClass, mod);
-
-            // the isInterface condition prevents Object as superclass of interface
-            if (_sootClass.hasSuperclass() && !_sootClass.isInterface()) {
-                _writer.writeDirectSuperclass(_sootClass, _sootClass.getSuperclass());
+                for (String mod : getModifiers(_sootClass.getModifiers(), false))
+                    if (!mod.trim().equals(""))
+                        _writer.writeClassModifier(_sootClass, mod);
+            } catch (Throwable t) {
+                reportClassError(_sootClass, "metadata", t);
             }
 
-            for (SootClass i : _sootClass.getInterfaces()) {
-                _writer.writeDirectSuperinterface(_sootClass, i);
+            try {
+                // the isInterface condition prevents Object as superclass of interface
+                if (_sootClass.hasSuperclass() && !_sootClass.isInterface()) {
+                    _writer.writeDirectSuperclass(_sootClass, _sootClass.getSuperclass());
+                }
+            } catch (Throwable t) {
+                reportClassError(_sootClass, "superclass", t);
             }
 
-            _sootClass.getFields().forEach(this::generate);
+            try {
+                for (SootClass i : _sootClass.getInterfaces()) {
+                    _writer.writeDirectSuperinterface(_sootClass, i);
+                }
+            } catch (Throwable t) {
+                reportClassError(_sootClass, "interfaces", t);
+            }
 
-            for (SootMethod m : new ArrayList<>(_sootClass.getMethods())) {
+            try {
+                _sootClass.getFields().forEach(this::generate);
+            } catch (Throwable t) {
+                reportClassError(_sootClass, "fields", t);
+            }
+
+            Collection<SootMethod> methods;
+            try {
+                // Snapshot before processing so an unrelated Soot resolution
+                // failure cannot abort iteration over the class set.
+                methods = new ArrayList<>(_sootClass.getMethods());
+            } catch (Throwable t) {
+                reportClassError(_sootClass, "methods", t);
+                continue;
+            }
+
+            for (SootMethod m : methods) {
                 SessionCounter session = new SessionCounter();
                 try {
                     generate(m, session);
@@ -87,6 +119,12 @@ class FactGenerator implements Runnable {
                 }
             }
         }
+    }
+
+    private void reportClassError(SootClass sootClass, String phase, Throwable t) {
+        String msg = "Error while processing " + phase + " for class " + sootClass + ": " + t.getMessage();
+        System.err.println(msg);
+        _driver.markError();
     }
 
     private void generate(SootField f)
