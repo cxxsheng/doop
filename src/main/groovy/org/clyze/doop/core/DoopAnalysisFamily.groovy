@@ -449,6 +449,14 @@ class DoopAnalysisFamily implements AnalysisFamily {
 					forCacheID: true
 			),
 			new AnalysisOption<String>(
+					id: "BODY_METHOD_REGEX",
+					name: "body-method-regex",
+					argName: "EXPRESSION",
+					group: GROUP_FACTS,
+					description: "Method expression selecting bodies as class-glob#method-glob terms.",
+					forCacheID: true
+			),
+			new AnalysisOption<String>(
 					id: "AUTO_APP_REGEX_MODE",
 					name: "auto-app-regex-mode",
 					argName: "MODE",

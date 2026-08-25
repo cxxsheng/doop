@@ -104,7 +104,7 @@ public class DoopAddons {
             //this is necessary because it can happen that phantom methods
             //are added during resolution
             for (SootMethod m : cl.getMethods())
-                if (m.isConcrete())
+                if (m.isConcrete() && (parameters == null || parameters.isBodyMethod(m)))
                     executor.execute(m::retrieveActiveBody);
         }
         System.out.println("Classes selected for body retrieval: " + selectedClasses

@@ -10,6 +10,7 @@ class DoopAnalysisOptionsTest extends Specification {
 
         expect:
         options.BODY_REGEX.name == "body-regex"
+        options.BODY_METHOD_REGEX.name == "body-method-regex"
         options.NO_FULL.name == "no-full"
         !options.NO_FULL.value
     }

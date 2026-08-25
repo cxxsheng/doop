@@ -15,6 +15,8 @@ import java.util.stream.Stream;
 import org.apache.log4j.Logger;
 import org.clyze.doop.util.filter.ClassFilter;
 import org.clyze.doop.util.filter.GlobClassFilter;
+import org.clyze.doop.util.filter.GlobMethodFilter;
+import org.clyze.doop.util.filter.MethodFilter;
 import org.clyze.utils.ContainerUtils;
 import org.clyze.utils.JHelper;
 
@@ -38,6 +40,7 @@ public class Parameters {
      * the historical behaviour (all resolved classes).
      */
     private ClassFilter bodyClassFilter;
+    private MethodFilter bodyMethodFilter;
     public boolean _scanNativeCode = false;
     public boolean _nativeRadare = false;
     public boolean _nativeBuiltin = false;
@@ -96,6 +99,10 @@ public class Parameters {
         bodyClassFilter = new GlobClassFilter(regex);
     }
 
+    private void setBodyMethodRegex(String regex) {
+        bodyMethodFilter = new GlobMethodFilter(regex);
+    }
+
     public void setInputs(List<String> inputs) {
         _inputs = inputs;
     }
@@ -137,6 +144,12 @@ public class Parameters {
      */
     public boolean isBodyClass(String className) {
         return bodyClassFilter == null || bodyClassFilter.matches(className);
+    }
+
+    /** Return whether a method body is admitted by both body policies. */
+    public boolean isBodyMethod(String className, String methodName) {
+        return isBodyClass(className) &&
+                (bodyMethodFilter == null || bodyMethodFilter.matches(className, methodName));
     }
 
     public List<String> getDependenciesAndPlatformLibs() {
@@ -227,6 +240,10 @@ public class Parameters {
         case "--body-regex":
             i = shift(args, i);
             setBodyRegex(args[i]);
+            break;
+        case "--body-method-regex":
+            i = shift(args, i);
+            setBodyMethodRegex(args[i]);
             break;
         case "--args-file":
             i = shift(args, i);

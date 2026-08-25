@@ -73,7 +73,8 @@ application {
     }
 
     applicationDistribution.from(projectDir) {
-        include 'docs', 'COLLABORATORS', 'DOOP_SQLITE_FACTS', 'DOOP_CLASS_FILTER', 'LICENSE', 'README.md'
+        include 'docs', 'COLLABORATORS', 'DOOP_SQLITE_FACTS', 'DOOP_CLASS_FILTER',
+                'DOOP_BODY_SCOPE', 'DOOP_METHOD_BODY_SCOPE', 'LICENSE', 'README.md'
     }
 
     def testSubprojects = [ '016-reflection', '104-method-references', '107-lambdas', '115-invokedynamic', '116-model-primitives' ]

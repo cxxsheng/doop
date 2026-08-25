@@ -305,7 +305,7 @@ public class Main {
             driver.generateInParallel(classes);
 
             logDebug(logger, "Checking class heaps for missing types...");
-            Collection<String> unrecorded = new ClassHeapFinder().getUnrecordedTypes(classes);
+            Collection<String> unrecorded = new ClassHeapFinder(sootParameters).getUnrecordedTypes(classes);
             if (!unrecorded.isEmpty()) {
                 // If option is set (--thorough-fact-gen), fail and notify the
                 // caller that fact generation must run again with these classes

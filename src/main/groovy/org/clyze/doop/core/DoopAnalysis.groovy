@@ -528,6 +528,8 @@ abstract class DoopAnalysis extends Analysis implements Runnable {
         // is appended here rather than in runFrontEnd().
         if (options.BODY_REGEX.value)
             params += [ "--body-regex", options.BODY_REGEX.value.toString() ]
+        if (options.BODY_METHOD_REGEX.value)
+            params += [ "--body-method-regex", options.BODY_METHOD_REGEX.value.toString() ]
 
         if (platform == "android") {
             // This uses all platformLibs.

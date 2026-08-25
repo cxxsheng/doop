@@ -28,6 +28,19 @@ import soot.jimple.InvokeStmt;
 class ClassHeapFinder {
     private final Collection<String> recordedTypes = new LinkedList<>();
     private final Collection<String> classHeapTypes = new LinkedList<>();
+    private final SootParameters sootParameters;
+
+    ClassHeapFinder() {
+        this(null);
+    }
+
+    /**
+     * @param sootParameters optional body-scope policy; null retains the
+     *                       historical all-class scan
+     */
+    ClassHeapFinder(SootParameters sootParameters) {
+        this.sootParameters = sootParameters;
+    }
 
     /**
      * Returns the heap types that appear in class constants.
@@ -45,8 +58,11 @@ class ClassHeapFinder {
     private void scan(Iterable<SootClass> classes) {
         for (SootClass c : classes) {
             recordedTypes.add(c.getName());
+            if (sootParameters != null && !sootParameters.isBodyClass(c))
+                continue;
             for (SootMethod m : c.getMethods())
-                if (!(m.isPhantom() || m.isAbstract() || m.isNative()))
+                if (!(m.isPhantom() || m.isAbstract() || m.isNative()) &&
+                        (sootParameters == null || sootParameters.isBodyMethod(m)))
                     scan(m);
         }
     }

@@ -196,7 +196,7 @@ class FactGenerator implements Runnable {
         // body-scope policy.  This second guard is required because a body may
         // be requested indirectly during fact generation even when the eager
         // retrieval pass skipped its declaring class.
-        if (!sootParameters.isBodyClass(m.getDeclaringClass()))
+        if (!sootParameters.isBodyMethod(m))
             return;
 
         if(!(m.isAbstract() || m.isNative())) {

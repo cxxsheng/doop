@@ -119,6 +119,23 @@ class SootParametersTest extends Specification {
         parameters.isBodyClass("b.B")
     }
 
+    def "Body method regex refines body class policy"() {
+        given:
+        SootParameters parameters = new SootParameters()
+        parameters.initFromArgs([
+            "--body-regex", "com.example.**",
+            "--body-method-regex", "com.example.**#*" + File.pathSeparator +
+                    "!com.example.Service#dump*",
+            "-i", "application.jar",
+            "-d", "out-dir"
+        ] as String[])
+
+        expect:
+        parameters.isBodyMethod("com.example.Service", "run")
+        !parameters.isBodyMethod("com.example.Service", "dumpState")
+        !parameters.isBodyMethod("other.Service", "run")
+    }
+
     def "SootParameters parsing"() {
         given:
         String[] args = [
